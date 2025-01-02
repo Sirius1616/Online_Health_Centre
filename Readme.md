@@ -1,6 +1,6 @@
 <h1>SIrius_aMed – Your Health's Trusted Care</h1>
 
-<p><strong>Developed by Biswadeb Mukherjee</strong> to streamline healthcare appointments and enhance digital healthcare experiences for patients and providers.</p>
+<p><strong>Developed by John Ezekiel Omokhagbon</strong> to streamline healthcare appointments and enhance digital healthcare experiences for patients and providers.</p>
 
 <p>SIrius_aMed is an intelligent healthcare appointment booking system that uses AI to provide personalized doctor recommendations. Designed for patients and healthcare providers, SIrius_aMed streamlines appointments to enhance the patient experience.</p>
 
