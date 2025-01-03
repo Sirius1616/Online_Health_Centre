@@ -1,6 +1,6 @@
 <h1>Sirius_aMed License</h1>
 
-© 2023 John Omokhagbon Ezekiel
+© 2025 John Omokhagbon Ezekiel
 
 <ol>
 <li><b>Ownership:</b></li>
