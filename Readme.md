@@ -1,4 +1,4 @@
-<h1>SIrius_aMed – Your Health's Trusted Care</h1>
+<h1>Sirius_aMed – Your Health's Trusted Care</h1>
 
 <p><strong>Developed by John Ezekiel Omokhagbon</strong> to streamline healthcare appointments and enhance digital healthcare experiences for patients and providers.</p>
 
