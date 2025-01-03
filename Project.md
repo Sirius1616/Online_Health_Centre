@@ -1,6 +1,6 @@
 <pre><code>
 
-ClopiMedi – Your Heart's Trusted Care - Version == 1.0.0 [Made by John Omokhagbon Ezekiel]
+Sirius_aMed – Your Heart's Trusted Care - Version == 1.0.0 [Made by John Omokhagbon Ezekiel]
 |
 |
 ├── .gitignore                         # Specifies files to ignore in version control
