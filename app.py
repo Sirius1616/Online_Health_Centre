@@ -2,10 +2,11 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 import pymysql
 import re
 import secrets
-from Modules.config import DATABASE_CONFIG
-from Modules.secret import SECRET_KEY
+from Modules.configuration import DATABASE_CONFIG
+from Modules.private import SECRET_KEY
 import datetime
-from Modules.doctor import RecommendationModel
+
+from Modules.physician import RecommendationModel
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -60,101 +61,148 @@ recommendation_model = RecommendationModel(data_path, model_filename, specialist
 
 @app.route('/')
 def home():
+    """Render the home page."""
     return render_template('home.html')
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST' and 'username' in request.form and 'password' in request.form:
-        username = request.form['username']
-        password = request.form['password']
-        
-        with pymysql.connect(**DATABASE_CONFIG) as connection:
-            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
-                account = cursor.fetchone()
+    """
+    Handle user login.
 
-                if account and account['password'] == password:
+    If the user submits the login form, check the credentials against the database.
+    If valid, create a session for the user and redirect to the dashboard.
+    If invalid, display an error message.
+
+    Returns:
+        render_template: Renders the login page.
+    """
+    if request.method == 'POST' and 'username' in request.form and 'password' in request.form:
+        username_input = request.form['username']
+        password_input = request.form['password']
+        
+        with pymysql.connect(**DATABASE_CONFIG) as db_connection:
+            with db_connection.cursor(pymysql.cursors.DictCursor) as db_cursor:
+                # Fetch user account from database
+                db_cursor.execute('SELECT * FROM users WHERE username = %s', (username_input,))
+                user_account = db_cursor.fetchone()
+
+                # Check if user credentials are correct
+                if user_account and user_account['password'] == password_input:
                     session['loggedin'] = True
-                    session['id'] = account['id']
-                    session['username'] = account['username']
+                    session['id'] = user_account['id']
+                    session['username'] = user_account['username']
                     return redirect(url_for('dashboard'))
                 else:
                     flash('danger', 'Incorrect username or password!')
 
     return render_template('login.html')
 
+
 @app.route('/logout')
 def logout():
+    """Log out the user and redirect to the login page."""
     session.pop('loggedin', None)
     session.pop('id', None)
     session.pop('username', None)
     return redirect(url_for('login'))
 
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """
+    Handle user registration.
+
+    If the user submits the registration form, validate the input and create a new user account in the database.
+    If the account already exists or if the input is invalid, display an error message.
+
+    Returns:
+        render_template: Renders the registration page.
+    """
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        email = request.form['email']
-        name = request.form['name']
-        phone = request.form['phone']
+        username_input = request.form['username']
+        password_input = request.form['password']
+        email_input = request.form['email']
+        name_input = request.form['name']
+        phone_input = request.form['phone']
         
-        with pymysql.connect(**DATABASE_CONFIG) as connection:
-            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
-                account = cursor.fetchone()
+        with pymysql.connect(**DATABASE_CONFIG) as db_connection:
+            with db_connection.cursor(pymysql.cursors.DictCursor) as db_cursor:
+                # Check if the username already exists
+                db_cursor.execute('SELECT * FROM users WHERE username = %s', (username_input,))
+                user_account = db_cursor.fetchone()
                 
-                if account:
+                if user_account:
                     flash('danger', 'Account already exists!')
-                elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+                elif not re.match(r'[^@]+@[^@]+\.[^@]+', email_input):
                     flash('danger', 'Invalid email address!')
-                elif not re.match(r'[A-Za-z0-9]+', username):
+                elif not re.match(r'[A-Za-z0-9]+', username_input):
                     flash('danger', 'Username must contain only characters and numbers!')
                 else:
-                    cursor.execute(
+                    # Create a new user account
+                    db_cursor.execute(
                         'INSERT INTO users (username, password, email, name, phone) VALUES (%s, %s, %s, %s, %s)',
-                        (username, password, email, name, phone)
+                        (username_input, password_input, email_input, name_input, phone_input)
                     )
-                    connection.commit()
+                    db_connection.commit()
                     flash('success', 'You have successfully registered!')
 
     return render_template('register.html')
 
+
 @app.route('/booking')
 def booking():
+    """Render the booking page."""
     return render_template('booking.html')
+
 
 @app.route('/dashboard')
 def dashboard():
+    """Render the dashboard for logged-in users."""
     return render_template('patient.html')
 
+
 def generate_token():
+    """Generate a unique token for appointment bookings."""
     return secrets.token_hex(8)
+
 
 @app.route('/book_appointment', methods=['POST'])
 def book_appointment():
-    if request.method == 'POST':
-        name = request.form['name']
-        age = request.form['age']
-        dob_str = request.form['dob']
-        phone = request.form['phone']
-        email = request.form['email']
-        specialist = request.form['specialist']
-        patient_condition = request.form['patient_condition']
-        medical_history = request.form['medical-history']
+    """
+    Book an appointment.
 
-        if not name or not age or not dob_str or not phone or not email:
+    Validate input data and store the appointment details in the database.
+    Generate a unique token for the appointment and recommend a specialist based on the patient's condition.
+
+    Returns:
+        render_template: Renders the recommendation page with the booked appointment details.
+    """
+    if request.method == 'POST':
+        name_input = request.form['name']
+        age_input = request.form['age']
+        dob_str = request.form['dob']
+        phone_input = request.form['phone']
+        email_input = request.form['email']
+        specialist_input = request.form['specialist']
+        patient_condition_input = request.form['patient_condition']
+        medical_history_input = request.form['medical-history']
+
+        # Validate required fields
+        if not name_input or not age_input or not dob_str or not phone_input or not email_input:
             flash('danger', 'All fields are required')
             return redirect(url_for('booking'))
         
-        recommended_doctor = recommendation_model.recommend_doctor(patient_condition)
-        print(f'Recommended Specialist: {specialist}')
+        # Recommend a specialist for the patient's condition
+        recommended_specialist = recommendation_model.recommend_doctor(patient_condition_input)
+        print(f'Recommended Specialist: {specialist_input}')
 
+        # Validate the date of birth format
         formats = ["%d/%m/%Y", "%d-%m-%Y"]
         dob = None
-        for format in formats:
+        for fmt in formats:
             try:
-                dob = datetime.datetime.strptime(dob_str, format).strftime("%Y-%m-%d")
+                dob = datetime.datetime.strptime(dob_str, fmt).strftime("%Y-%m-%d")
                 break
             except ValueError:
                 continue
@@ -163,10 +211,11 @@ def book_appointment():
             flash('danger', 'Invalid date format')
             return redirect(url_for('booking'))
 
-        with pymysql.connect(**DATABASE_CONFIG) as connection:
-            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                cursor.execute('SELECT MAX(token) AS max_token FROM appointments')
-                max_token = cursor.fetchone()
+        with pymysql.connect(**DATABASE_CONFIG) as db_connection:
+            with db_connection.cursor(pymysql.cursors.DictCursor) as db_cursor:
+                # Generate a unique appointment token
+                db_cursor.execute('SELECT MAX(token) AS max_token FROM appointments')
+                max_token = db_cursor.fetchone()
                 if max_token and max_token['max_token']:
                     last_token_number = int(max_token['max_token'][2:])
                     new_token_number = last_token_number + 1
@@ -174,60 +223,49 @@ def book_appointment():
                 else:
                     token = 'HC0001'
 
-                cursor.execute('INSERT INTO appointments (token, name, age, dob, phone, email, specialist, patient_condition, medical_history) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)',
-                               (token, name, age, dob, phone, email, specialist, patient_condition, medical_history))
-                connection.commit()
+                # Insert the appointment details into the database
+                db_cursor.execute('INSERT INTO appointments (token, name, age, dob, phone, email, specialist, patient_condition, medical_history) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)',
+                               (token, name_input, age_input, dob, phone_input, email_input, specialist_input, patient_condition_input, medical_history_input))
+                db_connection.commit()
 
-                cursor.execute('SELECT * FROM appointments WHERE token = %s', (token,))
-                new_appointment = cursor.fetchone()
+                # Fetch the newly created appointment for display
+                db_cursor.execute('SELECT * FROM appointments WHERE token = %s', (token,))
+                new_appointment = db_cursor.fetchone()
 
         flash('success', f'Appointment booked successfully! Your appointment token is: {token}')
-        return render_template('recommend.html', recommended_doctor=recommended_doctor, form_data=request.form, token=token)
+        return render_template('recommend.html', recommended_doctor=recommended_specialist, form_data=request.form, token=token)
 
     return render_template('booking.html')
 
+
 @app.route('/display_tokens')
 def display_tokens():
-    with pymysql.connect(**DATABASE_CONFIG) as connection:
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute('SELECT token FROM appointments')
-            tokens = cursor.fetchall()
+    """Display all appointment tokens."""
+    with pymysql.connect(**DATABASE_CONFIG) as db_connection:
+        with db_connection.cursor(pymysql.cursors.DictCursor) as db_cursor:
+            db_cursor.execute('SELECT token FROM appointments')
+            tokens = db_cursor.fetchall()
 
     token_list = [token['token'] for token in tokens]
     return render_template('token.html', token_list=token_list)
 
+
 @app.route('/recommend_appointment')
 def recommend_appointment_route():
+    """
+    Provide appointment recommendations based on the specified index.
+
+    This function fetches and displays a list of recommended appointments.
+
+    Returns:
+        render_template: Renders the recommendation page with appointment details.
+    """
     appointment_index = 5
-    num_recommendations = 5
-    recommendations = recommendation_model.get_recommendations(appointment_index, num_recommendations)
-    return render_template('recommend.html', recommendations=recommendations)
+    num_recommendations = 3
+    recommendations = recommendation_model.recommend(appointment_index, num_recommendations)
 
-def get_appointment_details(appointment_index):
-    with pymysql.connect(**DATABASE_CONFIG) as connection:
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute('SELECT * FROM appointments WHERE id = %s', (appointment_index,))
-            appointment_details = cursor.fetchone()
-    return appointment_details
+    return render_template('recommendation.html', recommendations=recommendations)
 
-@app.context_processor
-def utility_processor():
-    def get_appointment_details_wrapper(appointment_index):
-        return get_appointment_details(appointment_index)
-    return dict(get_appointment_details=get_appointment_details_wrapper)
-
-@app.route('/recommendations/<int:appointment_index>')
-def show_recommendations(appointment_index):
-    num_recommendations = 5
-    recommendations = recommendation_model.get_recommendations(appointment_index, num_recommendations)
-    recommendation_details = [get_appointment_details(index) for index in recommendations]
-    return render_template('recommends.html', recommendations=recommendation_details)
-
-@app.route('/suggest_specialist', methods=['POST'])
-def suggest_specialist():
-    patient_condition = request.json['patient_condition']
-    suggested_specialist = RecommendationModel(patient_condition)
-    return jsonify(suggested_specialist)
 
 if __name__ == '__main__':
     app.run(debug=True)
