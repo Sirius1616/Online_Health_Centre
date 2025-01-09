@@ -14,7 +14,7 @@ app.secret_key = SECRET_KEY
 # Set up the initial database and tables
 db_connection = pymysql.connect(**DATABASE_CONFIG)
 with db_connection.cursor() as cursor:
-    # Create the database if it doesn't exist
+    # Create the database if it doesn't exists
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DATABASE_CONFIG['database']}")
     cursor.execute(f"USE {DATABASE_CONFIG['database']}")
 
